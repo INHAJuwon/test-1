@@ -1,0 +1,146 @@
+#! /bin/bash
+echo "-----------------------------------------"
+echo "User Name: CHOIJUWON"
+echo "Student Number: 12201815"
+echo "[ MENU ]"
+echo "1. Get the data of the movie identified by a specific 'movie id' from 'u.item'"
+echo "2. Get the data of action genre movies from 'u.item'"
+echo "3. Get the average 'rating' of the movie identified by specific 'movie id' from 'u.data'"
+echo "4. Delete the 'IMDb URL' from 'u.user'"
+echo "5. Get the data about users from 'u.user'"
+echo "6. Modify the format of 'release date' in 'u.item'"
+echo "7. Get the data of movies rated by a specific 'user id' from 'u.data'"
+echo "8. Get the average 'rating' of movies rate by users with 'age' between 20 and 29 and 'occupation' as 'programmer'"
+echo "9. Exit"
+echo "-----------------------------------------"
+while true
+do
+read -p "Enter your choice [ 1-9 ] " num
+
+case "$num" in
+1)
+	echo ""
+	read -p "Please enter 'movie id' (1~1682): " mi
+	echo ""
+	awk -v nr="$mi" 'NR==nr {print; exit}' u.item
+	echo ""
+	;;
+2)
+	echo ""
+	read -p "Do you want to get the data of 'action' genre movies from 'u.item'?(y/n):" ac
+ 	echo ""
+	if [ "$ac" == "y" ]; then
+	sum=0
+		awk -F\| '{if ( $7 == 1 ) {print $1, $2; if ( ++sum == 10 ) exit}}' u.item
+		echo ""
+	else
+		echo ""
+	fi
+	;;
+3)
+	echo ""
+	read -p "Enter the 'movie id' (1~1682) : " i
+	echo ""
+	count=0
+	sum=0
+	file="u.data"
+	result=$(awk -v i="$i" '$2 == i { sum += $3; count++} END {if ( count > 0 ) printf "%.5f", sum / count}' "$file" )
+	echo "average rating of $i:  $result"
+	echo ""
+	;;
+4)
+	echo ""
+	read -p "Do you want to delete the 'IMDb URL' from 'u.item'?(y/n):" tf
+	echo ""
+	if [ "$tf" == "y" ]; then
+	sed 's/||[^|]*|/|||/g' u.item | head -n 10
+	echo ""
+	fi
+	;;
+5)
+	echo ""
+	read -p "Do you want to get the data about users from 'u.user'?(y/n):" tf
+	echo ""
+	if [ "$tf" == "y" ]; then
+	result=$(sed -n '1,10s/\(.*\)|\(.*\)|\(.*\)|\(.*\)|\(.*\)/user \1 is \2 years old \3 \4/p' u.user)
+	echo "$result" | sed -E 's/\bM\b/male/g; s/\bF\b/female/g'
+	echo ""
+	fi
+	;;
+6)
+	echo ""
+	read -p "Do you want to Modify the format of 'release data' in 'u.item'?(y/n):" tf
+	echo ""
+	if [ "$tf" == "y" ]; then
+	for(( i = 1673; i <= 1682; i++ )); do
+	row=$(sed -n "${i}p" u.item)
+	date=$(echo $row | awk -F\| '{print $3}')
+	new=$(date -d "$date" "+%Y%m%d")
+	echo "$row" | sed "s|$date|$new|"
+	done
+	echo ""
+	fi
+	;;
+7)
+	echo ""
+	read -p "Please enter the 'user id' (1~943):" id
+	echo ""
+	sort -t$'\t' -k2,2n u.data > sorted_u.data
+	result=$(awk -v i="$id" '$1 == i {printf "%s|", $2}' sorted_u.data)
+	result="${result%?}"
+	echo "$result"
+	echo ""
+	count=0;
+	IFS='|' read -ra movies <<< "$result"
+	for movie in "${movies[@]}"; do
+	awk -F\| -v id="$movie" '$1 == id {print $1 "|" $2; exit}' u.item
+	((count++))
+	if [ "$count" -eq 10 ]; then
+	break
+	fi
+	done
+	echo ""
+	;;
+8)
+	echo ""
+	read -p "Do you want to get the average 'rating' of movies rated by users with 'age' betwwen 20 and 29 and 'occupation' as 'programmer'?(y/n):" tf
+	echo ""
+	if [ "$tf" == "y" ]; then
+	users=$(awk -F '|' '$2 >= 20 && $2<=29 && $4=="programmer" {print $1}' u.user)
+	sort -t$'\t' -k2,2n u.data > sorted_u.data
+	current_mi="0"
+	total_rating=0
+	count=0
+	while IFS=$'\t' read -r u m r c; do
+	if [ "$m" != "$current_mi" ]; then
+		if [ "$count" -gt 0 ]; then
+		avr=$(printf "%.5f" "$(echo "scale=5; $total_rating / $count" | bc)")
+		echo "$current_mi $avr"
+		fi
+		current_mi="$m"
+		if [[ "${users}" =~ "${u}" ]]; then
+		total_rating="$r"
+		count=1
+		else
+		total_rating=0
+		count=0
+		fi
+	else
+		if [[ "${users}" =~ "${u}" ]]; then
+		total_rating=$((total_rating + r))
+		count=$((count + 1))
+		fi
+	fi
+	done < sorted_u.data
+	fi
+	echo ""
+	;;
+9)
+	echo "Bye!"
+	break
+	;;
+*)
+	echo "Please insert correct number"
+	;;
+esac
+done
